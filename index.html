@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>БИОСЛЕД — AI-мониторинг биоразнообразия</title>
+<link rel="manifest" href="manifest.json">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0f1c15;
+    --bg-alt:#16261d;
+    --paper:#efe7d4;
+    --paper-dim:#e4d9bf;
+    --ink:#1c2a20;
+    --ink-soft:#4a5a4e;
+    --accent:#c98a3b;
+    --accent-bright:#e2a75c;
+    --moss:#6fa287;
+    --rust:#b5533c;
+    --line:rgba(239,232,216,.14);
+    --line-strong:rgba(239,232,216,.28);
+    --shadow: 0 12px 30px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(1200px 600px at 15% -10%, rgba(111,162,135,.14), transparent 60%),
+      radial-gradient(900px 500px at 110% 10%, rgba(201,138,59,.10), transparent 55%),
+      var(--bg);
+    color:var(--paper);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+  }
+  ::selection{background:var(--accent);color:var(--ink);}
+  .app{max-width:1180px;margin:0 auto;padding:22px 20px 80px;}
+
+  /* ---------- Header ---------- */
+  header.top{
+    display:flex;align-items:flex-end;justify-content:space-between;
+    gap:16px;flex-wrap:wrap;
+    border-bottom:1px solid var(--line-strong);
+    padding-bottom:18px;margin-bottom:22px;
+  }
+  .brand{display:flex;align-items:center;gap:14px;}
+  .brand-mark{
+    width:46px;height:46px;border-radius:50%;
+    background:conic-gradient(from 200deg, var(--moss), var(--accent), var(--moss));
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Fraunces',serif;font-weight:700;font-size:18px;color:var(--ink);
+    box-shadow:var(--shadow);
+    flex-shrink:0;
+  }
+  h1{
+    font-family:'Fraunces',serif;font-weight:700;font-size:28px;letter-spacing:.5px;
+    margin:0;line-height:1;
+  }
+  .tagline{
+    font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--moss);margin-top:6px;
+  }
+  .stat-strip{display:flex;gap:22px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--paper-dim);}
+  .stat-strip b{display:block;font-family:'Fraunces',serif;font-size:22px;color:var(--accent-bright);font-weight:600;}
+
+  /* ---------- Tabs ---------- */
+  nav.tabs{
+    display:flex;gap:2px;margin-bottom:22px;border-bottom:1px solid var(--line);
+    overflow-x:auto;
+  }
+  nav.tabs button{
+    background:none;border:none;color:var(--paper-dim);
+    font-family:'JetBrains Mono',monospace;font-size:12.5px;letter-spacing:.06em;
+    padding:12px 18px;cursor:pointer;position:relative;white-space:nowrap;
+    text-transform:uppercase;
+  }
+  nav.tabs button .num{color:var(--moss);margin-right:8px;}
+  nav.tabs button.active{color:var(--paper);}
+  nav.tabs button.active::after{
+    content:'';position:absolute;left:14px;right:14px;bottom:-1px;height:2px;background:var(--accent);
+  }
+  nav.tabs button:hover{color:var(--paper);}
+
+  .panel{display:none;animation:fade .35s ease;}
+  .panel.active{display:block;}
+  @keyframes fade{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
+
+  h2.section-title{
+    font-family:'Fraunces',serif;font-weight:600;font-size:20px;margin:0 0 4px;
+  }
+  p.section-sub{color:var(--paper-dim);font-size:13.5px;margin:0 0 18px;max-width:640px;}
+
+  /* ---------- Cards / surfaces ---------- */
+  .card{
+    background:var(--bg-alt);border:1px solid var(--line);border-radius:10px;
+    padding:20px;
+  }
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+  @media(max-width:820px){.grid-2{grid-template-columns:1fr;}}
+
+  /* ---------- Capture tab ---------- */
+  .capture-frame{
+    aspect-ratio:4/3;background:#081008;border-radius:10px;overflow:hidden;
+    border:1px solid var(--line-strong);position:relative;display:flex;align-items:center;justify-content:center;
+  }
+  .capture-frame video, .capture-frame img{width:100%;height:100%;object-fit:cover;display:block;}
+  .capture-frame .placeholder{color:var(--ink-soft);font-family:'JetBrains Mono',monospace;font-size:12px;text-align:center;padding:20px;}
+  .capture-frame .corner{position:absolute;width:22px;height:22px;border-color:var(--accent);opacity:.85;}
+  .corner.tl{top:10px;left:10px;border-top:2px solid;border-left:2px solid;}
+  .corner.tr{top:10px;right:10px;border-top:2px solid;border-right:2px solid;}
+  .corner.bl{bottom:10px;left:10px;border-bottom:2px solid;border-left:2px solid;}
+  .corner.br{bottom:10px;right:10px;border-bottom:2px solid;border-right:2px solid;}
+
+  .btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;}
+  button.btn{
+    font-family:'Inter',sans-serif;font-weight:600;font-size:13px;
+    border-radius:7px;padding:10px 16px;cursor:pointer;border:1px solid var(--line-strong);
+    background:transparent;color:var(--paper);transition:transform .12s ease, background .15s ease;
+  }
+  button.btn:hover{background:rgba(239,232,216,.06);}
+  button.btn:active{transform:scale(.97);}
+  button.btn.primary{background:var(--accent);border-color:var(--accent);color:#241605;}
+  button.btn.primary:hover{background:var(--accent-bright);}
+  button.btn.danger{border-color:var(--rust);color:var(--rust);}
+  button.btn.danger:hover{background:rgba(181,83,60,.12);}
+  button.btn:disabled{opacity:.4;cursor:not-allowed;}
+  input[type=file]{display:none;}
+
+  .geo-status{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--moss);margin-top:12px;display:flex;align-items:center;gap:8px;}
+  .geo-status.err{color:var(--rust);}
+  .manual-geo{display:flex;gap:8px;margin-top:8px;}
+  .manual-geo input{
+    width:100%;background:var(--bg);border:1px solid var(--line-strong);border-radius:6px;
+    color:var(--paper);padding:7px 9px;font-family:'JetBrains Mono',monospace;font-size:12px;
+  }
+
+  .id-result{margin-top:6px;}
+  .id-result .empty{color:var(--ink-soft);font-size:13px;font-family:'JetBrains Mono',monospace;}
+  .spinner{
+    width:16px;height:16px;border-radius:50%;border:2px solid var(--line-strong);
+    border-top-color:var(--accent);animation:spin 0.8s linear infinite;display:inline-block;vertical-align:-3px;margin-right:8px;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .ticket{
+    background:var(--paper);color:var(--ink);border-radius:8px;padding:18px 18px 16px;
+    position:relative;box-shadow:var(--shadow);
+  }
+  .ticket::before,.ticket::after{
+    content:'';position:absolute;top:50%;width:16px;height:16px;background:var(--bg);border-radius:50%;transform:translateY(-50%);
+  }
+  .ticket::before{left:-8px;} .ticket::after{right:-8px;}
+  .ticket .sp-common{font-family:'Fraunces',serif;font-weight:700;font-size:21px;line-height:1.15;}
+  .ticket .sp-sci{font-style:italic;color:var(--ink-soft);font-size:13.5px;margin-top:2px;}
+  .badges{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;}
+  .badge{
+    font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;
+    padding:3px 9px;border-radius:20px;border:1px solid var(--ink);color:var(--ink);
+  }
+  .badge.conf-высокая{background:var(--moss);border-color:var(--moss);color:#0f1c15;}
+  .badge.conf-средняя{background:var(--accent);border-color:var(--accent);color:#241605;}
+  .badge.conf-низкая{background:transparent;}
+  .ticket .desc{font-size:13.5px;line-height:1.5;margin-top:8px;}
+  .ticket .divider{border-top:1px dashed rgba(28,42,32,.3);margin:12px 0;}
+
+  /* ---------- Journal ---------- */
+  .journal-toolbar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;}
+  .journal-toolbar input[type=search]{
+    flex:1;min-width:180px;background:var(--bg-alt);border:1px solid var(--line-strong);
+    border-radius:7px;color:var(--paper);padding:9px 12px;font-family:'Inter',sans-serif;font-size:13px;
+  }
+  .scope-toggle{display:flex;border:1px solid var(--line-strong);border-radius:7px;overflow:hidden;}
+  .scope-toggle button{
+    background:transparent;border:none;color:var(--paper-dim);padding:9px 14px;font-size:12px;
+    font-family:'JetBrains Mono',monospace;cursor:pointer;
+  }
+  .scope-toggle button.active{background:var(--moss);color:#0f1c15;}
+
+  .entries{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;}
+  .entry-ticket{
+    background:var(--paper);color:var(--ink);border-radius:8px;overflow:hidden;box-shadow:var(--shadow);
+    display:flex;flex-direction:column;
+  }
+  .entry-thumb{width:100%;aspect-ratio:4/3;object-fit:cover;background:#ccc;}
+  .entry-body{padding:12px 13px 13px;flex:1;display:flex;flex-direction:column;}
+  .entry-body .sp{font-family:'Fraunces',serif;font-weight:700;font-size:15.5px;line-height:1.2;}
+  .entry-body .sci{font-style:italic;color:var(--ink-soft);font-size:11.5px;margin-top:1px;}
+  .entry-meta{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink-soft);margin-top:8px;display:flex;justify-content:space-between;}
+  .entry-actions{display:flex;justify-content:space-between;align-items:center;margin-top:10px;}
+  .entry-actions button{
+    background:none;border:1px solid var(--ink);color:var(--ink);border-radius:5px;
+    font-size:10px;font-family:'JetBrains Mono',monospace;padding:4px 8px;cursor:pointer;
+  }
+  .empty-state{
+    text-align:center;padding:60px 20px;color:var(--ink-soft);font-family:'JetBrains Mono',monospace;font-size:13px;
+    border:1px dashed var(--line-strong);border-radius:10px;
+  }
+
+  /* ---------- Map ---------- */
+  #map-el{width:100%;height:480px;border-radius:10px;border:1px solid var(--line-strong);}
+  .leaflet-popup-content-wrapper{background:var(--paper);color:var(--ink);border-radius:8px;}
+  .leaflet-popup-tip{background:var(--paper);}
+  .map-popup img{width:100%;border-radius:5px;margin-bottom:6px;}
+  .map-popup .sp{font-family:'Fraunces',serif;font-weight:700;font-size:14px;}
+  .map-legend{display:flex;gap:16px;margin-top:12px;flex-wrap:wrap;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--paper-dim);}
+  .map-legend span{display:inline-flex;align-items:center;gap:6px;}
+  .dot{width:10px;height:10px;border-radius:50%;display:inline-block;}
+
+  /* ---------- Analytics ---------- */
+  .stat-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px;}
+  .stat-card{background:var(--bg-alt);border:1px solid var(--line);border-radius:9px;padding:14px 16px;}
+  .stat-card .v{font-family:'Fraunces',serif;font-size:26px;font-weight:600;color:var(--accent-bright);}
+  .stat-card .l{font-family:'JetBrains Mono',monospace;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--paper-dim);margin-top:2px;}
+  .chart-wrap{background:var(--bg-alt);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:18px;}
+  .chart-wrap h3{margin:0 0 12px;font-family:'Fraunces',serif;font-size:15px;font-weight:600;}
+  select{
+    background:var(--bg);border:1px solid var(--line-strong);color:var(--paper);border-radius:6px;
+    padding:7px 10px;font-family:'JetBrains Mono',monospace;font-size:12px;
+  }
+
+  /* ---------- Settings ---------- */
+  .setting-row{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--line);gap:16px;}
+  .setting-row:last-child{border-bottom:none;}
+  .setting-row .t{font-weight:600;font-size:13.5px;}
+  .setting-row .d{color:var(--paper-dim);font-size:12px;margin-top:3px;max-width:440px;}
+  .switch{position:relative;width:42px;height:24px;flex-shrink:0;}
+  .switch input{opacity:0;width:0;height:0;}
+  .slider-el{position:absolute;inset:0;background:var(--bg);border:1px solid var(--line-strong);border-radius:20px;cursor:pointer;transition:.2s;}
+  .slider-el::before{content:'';position:absolute;width:16px;height:16px;left:3px;top:2px;background:var(--paper-dim);border-radius:50%;transition:.2s;}
+  .switch input:checked + .slider-el{background:var(--moss);}
+  .switch input:checked + .slider-el::before{transform:translateX(18px);background:var(--ink);}
+  .notice{
+    font-size:12px;color:var(--paper-dim);background:rgba(201,138,59,.08);border:1px solid rgba(201,138,59,.3);
+    border-radius:8px;padding:10px 12px;margin-top:14px;line-height:1.5;
+  }
+  .toast{
+    position:fixed;bottom:22px;left:50%;transform:translateX(-50%);
+    background:var(--paper);color:var(--ink);padding:10px 18px;border-radius:8px;
+    font-size:13px;font-weight:600;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .25s;z-index:999;
+  }
+  .toast.show{opacity:1;}
+  footer.foot{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:var(--ink-soft);font-family:'JetBrains Mono',monospace;font-size:10.5px;text-align:center;}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="top">
+    <div class="brand">
+      <div class="brand-mark">БС</div>
+      <div>
+        <h1>БИОСЛЕД</h1>
+        <div class="tagline">камера → вид → база → карта → анализ</div>
+      </div>
+    </div>
+    <div class="stat-strip">
+      <div><b id="hdr-total">0</b>наблюдений</div>
+      <div><b id="hdr-species">0</b>видов</div>
+      <div id="hdr-account" style="cursor:pointer" title="Аккаунт"><b id="hdr-account-mark">✕</b>вход</div>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="active" data-tab="capture"><span class="num">01</span>Наблюдение</button>
+    <button data-tab="journal"><span class="num">02</span>Журнал</button>
+    <button data-tab="map"><span class="num">03</span>Карта</button>
+    <button data-tab="analytics"><span class="num">04</span>Аналитика</button>
+    <button data-tab="account"><span class="num">05</span>Аккаунт</button>
+    <button data-tab="settings"><span class="num">06</span>Настройки</button>
+  </nav>
+
+  <!-- ============ TAB 1: CAPTURE ============ -->
+  <section class="panel active" id="panel-capture">
+    <h2 class="section-title">Зафиксировать наблюдение</h2>
+    <p class="section-sub">Сделайте снимок или загрузите фото — модель определит вид, а наблюдение сохранится в журнал с координатами и временем.</p>
+    <div class="grid-2">
+      <div>
+        <div class="capture-frame" id="capture-frame">
+          <div class="placeholder" id="capture-placeholder">Камера не активна<br>нажмите «Включить камеру» или загрузите фото</div>
+          <video id="video" autoplay playsinline style="display:none"></video>
+          <img id="captured-img" style="display:none">
+          <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
+        </div>
+        <div class="btn-row">
+          <button class="btn" id="btn-cam-on">Включить камеру</button>
+          <button class="btn" id="btn-snap" disabled>Сделать снимок</button>
+          <button class="btn" id="btn-upload">Загрузить фото</button>
+          <input type="file" id="file-input" accept="image/*">
+        </div>
+        <div class="geo-status" id="geo-status">определяем местоположение…</div>
+        <div class="manual-geo" id="manual-geo" style="display:none">
+          <input type="number" step="0.0001" id="manual-lat" placeholder="широта">
+          <input type="number" step="0.0001" id="manual-lon" placeholder="долгота">
+        </div>
+      </div>
+      <div>
+        <div class="btn-row" style="margin-top:0">
+          <button class="btn primary" id="btn-identify" disabled>Определить вид</button>
+          <button class="btn" id="btn-retake" disabled>Сбросить</button>
+        </div>
+        <div class="id-result" id="id-result">
+          <p class="empty">Здесь появится определение вида после анализа снимка.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TAB 2: JOURNAL ============ -->
+  <section class="panel" id="panel-journal">
+    <h2 class="section-title">Журнал наблюдений</h2>
+    <p class="section-sub">Все сохранённые записи. Личные наблюдения видны только вам; переключитесь на «Сообщество», чтобы увидеть общие данные.</p>
+    <div class="journal-toolbar">
+      <input type="search" id="journal-search" placeholder="Поиск по виду…">
+      <div class="scope-toggle" id="journal-scope">
+        <button class="active" data-scope="personal">Мои</button>
+        <button data-scope="shared">Сообщество</button>
+      </div>
+      <button class="btn" id="btn-export">Экспорт CSV</button>
+    </div>
+    <div class="entries" id="entries-list"></div>
+  </section>
+
+  <!-- ============ TAB 3: MAP ============ -->
+  <section class="panel" id="panel-map">
+    <h2 class="section-title">Карта наблюдений</h2>
+    <p class="section-sub">Точки на карте — места, где были сделаны наблюдения. Цвет отмечает класс организма.</p>
+    <div class="journal-toolbar">
+      <div class="scope-toggle" id="map-scope">
+        <button class="active" data-scope="personal">Мои</button>
+        <button data-scope="shared">Сообщество</button>
+      </div>
+    </div>
+    <div id="map-el"></div>
+    <div class="map-legend">
+      <span><i class="dot" style="background:#e2a75c"></i>птица</span>
+      <span><i class="dot" style="background:#6fa287"></i>млекопитающее</span>
+      <span><i class="dot" style="background:#7a9fc9"></i>рептилия/амфибия</span>
+      <span><i class="dot" style="background:#c96f9a"></i>насекомое</span>
+      <span><i class="dot" style="background:#9a8fd9"></i>растение</span>
+      <span><i class="dot" style="background:#b5533c"></i>другое</span>
+    </div>
+  </section>
+
+  <!-- ============ TAB 4: ANALYTICS ============ -->
+  <section class="panel" id="panel-analytics">
+    <h2 class="section-title">Аналитика популяций</h2>
+    <p class="section-sub">Статистика строится по числу зафиксированных встреч — это показатель наблюдательной активности, а не точная численность популяции.</p>
+    <div class="journal-toolbar">
+      <div class="scope-toggle" id="analytics-scope">
+        <button class="active" data-scope="personal">Мои</button>
+        <button data-scope="shared">Сообщество</button>
+      </div>
+    </div>
+    <div class="stat-cards" id="stat-cards"></div>
+    <div class="chart-wrap">
+      <h3>Наблюдения по датам</h3>
+      <canvas id="chart-timeline" height="90"></canvas>
+    </div>
+    <div class="chart-wrap">
+      <h3>Распределение по видам</h3>
+      <canvas id="chart-species" height="90"></canvas>
+    </div>
+    <div class="chart-wrap">
+      <h3>Динамика конкретного вида <select id="species-select"></select></h3>
+      <canvas id="chart-trend" height="90"></canvas>
+    </div>
+  </section>
+
+  <!-- ============ TAB 5: ACCOUNT ============ -->
+  <section class="panel" id="panel-account">
+    <h2 class="section-title">Аккаунт</h2>
+    <p class="section-sub">Вход нужен, чтобы сохранять наблюдения и надёжно отделять ваши личные записи от чужих. Просматривать карту и общий журнал сообщества можно и без входа.</p>
+
+    <div class="card" id="account-logged-out">
+      <div class="setting-row" style="border:none;padding-top:0">
+        <div style="width:100%">
+          <div class="t" style="margin-bottom:10px">Войти или зарегистрироваться</div>
+          <div class="manual-geo" style="margin-top:0">
+            <input type="email" id="auth-email" placeholder="email">
+            <input type="password" id="auth-password" placeholder="пароль (мин. 6 симв.)">
+          </div>
+          <div class="btn-row">
+            <button class="btn primary" id="btn-signin">Войти</button>
+            <button class="btn" id="btn-signup">Зарегистрироваться</button>
+          </div>
+          <div id="auth-message" style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--moss);margin-top:10px"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="account-logged-in" style="display:none">
+      <div class="setting-row">
+        <div>
+          <div class="t">Вы вошли как <span id="account-email" style="color:var(--accent-bright)"></span></div>
+          <div class="d">Все новые наблюдения сохраняются под этой учётной записью.</div>
+        </div>
+        <button class="btn danger" id="btn-signout">Выйти</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TAB 6: SETTINGS ============ -->
+  <section class="panel" id="panel-settings">
+    <h2 class="section-title">Настройки</h2>
+    <div class="card">
+      <div class="setting-row">
+        <div>
+          <div class="t">Делиться наблюдениями с сообществом по умолчанию</div>
+          <div class="d">Если включено, новые наблюдения будут одновременно попадать в общую базу, видимую всем пользователям этого приложения. Личные данные при этом сохраняются отдельно.</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="toggle-share-default"><span class="slider-el"></span></label>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="t">Очистить мои наблюдения</div>
+          <div class="d">Безвозвратно удаляет все личные записи журнала на этом устройстве. Общие данные сообщества не затрагиваются.</div>
+        </div>
+        <button class="btn danger" id="btn-clear">Очистить</button>
+      </div>
+    </div>
+    <div class="notice">
+      ⚠ Определение вида выполняется AI-моделью по фотографии и может ошибаться, особенно на нечётких снимках или для похожих видов. Для научных и природоохранных решений подтверждайте результат у специалиста-биолога.
+    </div>
+    <div class="notice">
+      Это веб-приложение. Чтобы превратить его в приложение, устанавливаемое на телефон или компьютер, разместите файлы (biosled.html, manifest.json, service-worker.js) на любом хостинге с HTTPS — после этого браузер предложит «Установить на устройство». Подробности — в файле INSTALL.md.
+    </div>
+  </section>
+
+  <footer class="foot">БИОСЛЕД · камера → распознавание вида → база данных → карта → анализ изменения популяции</footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ================= НАСТРОЙКИ ДЛЯ САМОСТОЯТЕЛЬНОГО ХОСТИНГА =================
+  // Заполните три значения ниже по инструкции из DEPLOY.md, иначе приложение
+  // не сможет ни определять виды, ни сохранять наблюдения.
+  const CONFIG = {
+    // Адрес вашего Cloudflare Worker из шага "Разверните прокси" (worker.js)
+    PROXY_URL: "https://damp-bonus-7b7a.aaazzz14aaa.workers.dev/",
+    // Из Supabase Dashboard → Project Settings → API
+    SUPABASE_URL: "https://grfjiypakcdpnadrrxfh.supabase.co",
+    SUPABASE_ANON_KEY: "sb_publishable_zI77jZkeodIathOvpEkGoA_2KGy1Kyk",
+  };
+  // =============================================================================
+
+  // ---------------- auth (Supabase) ----------------
+  let session = null; // {access_token, refresh_token, user:{id,email}}
+  function loadSession(){
+    try{ session = JSON.parse(localStorage.getItem('biosled_session')||'null'); }catch(e){ session = null; }
+  }
+  function persistSession(){ localStorage.setItem('biosled_session', JSON.stringify(session)); }
+  function clearSession(){ session = null; localStorage.removeItem('biosled_session'); }
+
+  async function authRequest(path, body){
+    const res = await fetch(`${CONFIG.SUPABASE_URL}/auth/v1/${path}`, {
+      method:'POST',
+      headers:{'apikey':CONFIG.SUPABASE_ANON_KEY, 'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    return {ok:res.ok, status:res.status, data};
+  }
+
+  async function signUp(email, password){
+    const {ok, data} = await authRequest('signup', {email, password});
+    if(!ok) throw new Error(data.msg || data.error_description || data.error || 'Ошибка регистрации');
+    if(data.access_token){
+      session = {access_token:data.access_token, refresh_token:data.refresh_token, user:{id:data.user.id, email:data.user.email}};
+      persistSession();
+      return {confirmed:true};
+    }
+    return {confirmed:false}; // требуется подтверждение по email
+  }
+
+  async function signIn(email, password){
+    const {ok, data} = await authRequest('token?grant_type=password', {email, password});
+    if(!ok) throw new Error(data.msg || data.error_description || data.error || 'Неверный email или пароль');
+    session = {access_token:data.access_token, refresh_token:data.refresh_token, user:{id:data.user.id, email:data.user.email}};
+    persistSession();
+  }
+
+  async function refreshAuthSession(){
+    if(!session || !session.refresh_token) return false;
+    const {ok, data} = await authRequest('token?grant_type=refresh_token', {refresh_token:session.refresh_token});
+    if(!ok){ clearSession(); return false; }
+    session = {access_token:data.access_token, refresh_token:data.refresh_token, user:{id:data.user.id, email:data.user.email}};
+    persistSession();
+    return true;
+  }
+
+  function signOut(){ clearSession(); renderAccountUI(); updateHeaderStats(); }
+
+  function renderAccountUI(){
+    const loggedOut = document.getElementById('account-logged-out');
+    const loggedIn = document.getElementById('account-logged-in');
+    const markEl = document.getElementById('hdr-account-mark');
+    if(session){
+      loggedOut.style.display = 'none';
+      loggedIn.style.display = 'block';
+      document.getElementById('account-email').textContent = session.user.email;
+      markEl.textContent = '✓';
+    } else {
+      loggedOut.style.display = 'block';
+      loggedIn.style.display = 'none';
+      markEl.textContent = '✕';
+    }
+  }
+
+  document.getElementById('btn-signin').addEventListener('click', async ()=>{
+    const email = document.getElementById('auth-email').value.trim();
+    const password = document.getElementById('auth-password').value;
+    const msg = document.getElementById('auth-message');
+    if(!email || !password){ msg.textContent = 'Укажите email и пароль'; return; }
+    msg.textContent = 'входим…';
+    try{
+      await signIn(email, password);
+      msg.textContent = '';
+      renderAccountUI();
+      await updateHeaderStats();
+      toast('Вы вошли ✓');
+    }catch(e){ msg.textContent = e.message; }
+  });
+
+  document.getElementById('btn-signup').addEventListener('click', async ()=>{
+    const email = document.getElementById('auth-email').value.trim();
+    const password = document.getElementById('auth-password').value;
+    const msg = document.getElementById('auth-message');
+    if(!email || !password){ msg.textContent = 'Укажите email и пароль'; return; }
+    if(password.length < 6){ msg.textContent = 'Пароль минимум 6 символов'; return; }
+    msg.textContent = 'регистрируем…';
+    try{
+      const r = await signUp(email, password);
+      if(r.confirmed){
+        msg.textContent = '';
+        renderAccountUI();
+        await updateHeaderStats();
+        toast('Регистрация завершена ✓');
+      } else {
+        msg.textContent = 'Проверьте почту и подтвердите email, затем войдите.';
+      }
+    }catch(e){ msg.textContent = e.message; }
+  });
+
+  document.getElementById('btn-signout').addEventListener('click', signOut);
+  document.getElementById('hdr-account').addEventListener('click', ()=>{
+    document.querySelector('nav.tabs button[data-tab="account"]').click();
+  });
+
+  // Универсальный fetch к Supabase REST с авто-обновлением истёкшего токена
+  function sbHeaders(extra){
+    return Object.assign({
+      'apikey': CONFIG.SUPABASE_ANON_KEY,
+      'Authorization': 'Bearer ' + (session ? session.access_token : CONFIG.SUPABASE_ANON_KEY),
+      'Content-Type': 'application/json'
+    }, extra||{});
+  }
+  async function sbFetch(url, options){
+    let res = await fetch(url, {...options, headers: sbHeaders(options && options.headers)});
+    if(res.status === 401 && session){
+      const refreshed = await refreshAuthSession();
+      if(refreshed){
+        res = await fetch(url, {...options, headers: sbHeaders(options && options.headers)});
+      }
+    }
+    return res;
+  }
+
+  // ---------------- state ----------------
+  let stream = null;
+  let capturedDataUrl = null;      // full-size for API
+  let capturedThumbUrl = null;     // small for storage
+  let currentGeo = {lat:null, lon:null, manual:false};
+  let currentIdentification = null;
+  let journalScope = 'personal';
+  let mapScope = 'personal';
+  let analyticsScope = 'personal';
+  let leafletMap = null, markerLayer = null;
+  let chartTimeline = null, chartSpecies = null, chartTrend = null;
+
+  const CLASS_COLORS = {
+    'птица':'#e2a75c','млекопитающее':'#6fa287','рептилия':'#7a9fc9','амфибия':'#7a9fc9',
+    'насекомое':'#c96f9a','растение':'#9a8fd9'
+  };
+  function classColor(c){ return CLASS_COLORS[(c||'').toLowerCase()] || '#b5533c'; }
+
+  function toast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove('show'), 2600);
+  }
+
+  // ---------------- tabs ----------------
+  document.querySelectorAll('nav.tabs button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
+      if(btn.dataset.tab==='journal') renderJournal();
+      if(btn.dataset.tab==='map') initOrRefreshMap();
+      if(btn.dataset.tab==='analytics') renderAnalytics();
+      if(btn.dataset.tab==='account') renderAccountUI();
+    });
+  });
+
+  // ---------------- storage helpers (Supabase REST) ----------------
+  // "personal" = только строки, принадлежащие вошедшему пользователю (user_id = auth.uid())
+  // "shared"   = все строки с shared=true (видны всем, даже без входа — так работает карта сообщества)
+  function rowToObs(r){
+    return {
+      id: r.id, species: r.species, scientificName: r.scientific_name, class: r.class,
+      confidence: r.confidence, conservationStatus: r.conservation_status, description: r.description,
+      lat: r.lat, lon: r.lon, timestamp: new Date(r.created_at).getTime(), photo: r.photo,
+      _userId: r.user_id
+    };
+  }
+  function obsToRow(o, shared){
+    return {
+      user_id: session ? session.user.id : null, shared: !!shared, species: o.species, scientific_name: o.scientificName,
+      class: o.class, confidence: o.confidence, conservation_status: o.conservationStatus,
+      description: o.description, lat: o.lat, lon: o.lon, photo: o.photo
+    };
+  }
+  async function loadObservations(shared){
+    if(shared===false && !session) return []; // личный журнал недоступен без входа
+    try{
+      const filter = shared ? `shared=eq.true` : `user_id=eq.${session.user.id}&shared=eq.false`;
+      const res = await sbFetch(`${CONFIG.SUPABASE_URL}/rest/v1/observations?${filter}&order=created_at.desc`, {
+        method:'GET'
+      });
+      if(!res.ok) throw new Error('Supabase: ' + res.status);
+      const rows = await res.json();
+      return rows.map(rowToObs);
+    }catch(e){ console.error('load error', e); return []; }
+  }
+  async function insertObservation(o, shared){
+    if(!session) return false; // вставка требует входа — так задано в RLS
+    try{
+      const res = await sbFetch(`${CONFIG.SUPABASE_URL}/rest/v1/observations`, {
+        method: 'POST', headers: {'Prefer':'return=minimal'},
+        body: JSON.stringify(obsToRow(o, shared))
+      });
+      return res.ok;
+    }catch(e){ console.error('insert error', e); return false; }
+  }
+  async function deleteObservation(id){
+    if(!session) return false;
+    try{
+      const res = await sbFetch(`${CONFIG.SUPABASE_URL}/rest/v1/observations?id=eq.${id}&user_id=eq.${session.user.id}`, {
+        method: 'DELETE'
+      });
+      return res.ok;
+    }catch(e){ console.error('delete error', e); return false; }
+  }
+  async function clearPersonalObservations(){
+    if(!session) return false;
+    try{
+      const res = await sbFetch(`${CONFIG.SUPABASE_URL}/rest/v1/observations?user_id=eq.${session.user.id}&shared=eq.false`, {
+        method: 'DELETE'
+      });
+      return res.ok;
+    }catch(e){ console.error('clear error', e); return false; }
+  }
+
+  async function updateHeaderStats(){
+    const list = await loadObservations(false);
+    document.getElementById('hdr-total').textContent = list.length;
+    document.getElementById('hdr-species').textContent = new Set(list.map(o=>o.species)).size;
+  }
+
+  // ---------------- geolocation ----------------
+  function initGeo(){
+    const statusEl = document.getElementById('geo-status');
+    if(!navigator.geolocation){
+      statusEl.textContent = 'геолокация недоступна — введите координаты вручную';
+      statusEl.classList.add('err');
+      showManualGeo();
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(pos=>{
+      currentGeo.lat = pos.coords.latitude;
+      currentGeo.lon = pos.coords.longitude;
+      currentGeo.manual = false;
+      statusEl.classList.remove('err');
+      statusEl.textContent = 'координаты определены: ' + currentGeo.lat.toFixed(4) + ', ' + currentGeo.lon.toFixed(4);
+    }, err=>{
+      statusEl.classList.add('err');
+      statusEl.textContent = 'не удалось определить местоположение — введите вручную';
+      showManualGeo();
+    }, {timeout:8000});
+  }
+  function showManualGeo(){
+    document.getElementById('manual-geo').style.display = 'flex';
+  }
+  document.getElementById('manual-lat').addEventListener('input', e=>{
+    currentGeo.lat = parseFloat(e.target.value); currentGeo.manual = true;
+  });
+  document.getElementById('manual-lon').addEventListener('input', e=>{
+    currentGeo.lon = parseFloat(e.target.value); currentGeo.manual = true;
+  });
+  initGeo();
+
+  // ---------------- camera ----------------
+  const video = document.getElementById('video');
+  const capturedImg = document.getElementById('captured-img');
+  const placeholder = document.getElementById('capture-placeholder');
+
+  document.getElementById('btn-cam-on').addEventListener('click', async ()=>{
+    try{
+      stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+      video.srcObject = stream;
+      video.style.display = 'block';
+      capturedImg.style.display = 'none';
+      placeholder.style.display = 'none';
+      document.getElementById('btn-snap').disabled = false;
+    }catch(e){
+      toast('Камера недоступна: ' + e.message);
+    }
+  });
+
+  document.getElementById('btn-snap').addEventListener('click', ()=>{
+    const canvas = document.createElement('canvas');
+    const w = video.videoWidth, h = video.videoHeight;
+    canvas.width = w; canvas.height = h;
+    canvas.getContext('2d').drawImage(video, 0, 0, w, h);
+    finishCapture(canvas);
+  });
+
+  document.getElementById('btn-upload').addEventListener('click', ()=>{
+    document.getElementById('file-input').click();
+  });
+  document.getElementById('file-input').addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    const img = new Image();
+    img.onload = ()=>{
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width; canvas.height = img.height;
+      canvas.getContext('2d').drawImage(img,0,0);
+      finishCapture(canvas);
+    };
+    img.src = URL.createObjectURL(file);
+  });
+
+  function finishCapture(canvas){
+    // full-size (bounded) for API accuracy
+    const apiCanvas = resizeCanvas(canvas, 900);
+    capturedDataUrl = apiCanvas.toDataURL('image/jpeg', 0.75);
+    // small thumbnail for storage
+    const thumbCanvas = resizeCanvas(canvas, 320);
+    capturedThumbUrl = thumbCanvas.toDataURL('image/jpeg', 0.55);
+
+    capturedImg.src = capturedDataUrl;
+    capturedImg.style.display = 'block';
+    video.style.display = 'none';
+    placeholder.style.display = 'none';
+    if(stream){ stream.getTracks().forEach(t=>t.stop()); stream = null; }
+
+    document.getElementById('btn-identify').disabled = false;
+    document.getElementById('btn-retake').disabled = false;
+    document.getElementById('btn-snap').disabled = true;
+    currentIdentification = null;
+    document.getElementById('id-result').innerHTML = '<p class="empty">Снимок готов — нажмите «Определить вид».</p>';
+  }
+
+  function resizeCanvas(src, maxDim){
+    const scale = Math.min(1, maxDim / Math.max(src.width, src.height));
+    const c = document.createElement('canvas');
+    c.width = Math.round(src.width*scale);
+    c.height = Math.round(src.height*scale);
+    c.getContext('2d').drawImage(src, 0, 0, c.width, c.height);
+    return c;
+  }
+
+  document.getElementById('btn-retake').addEventListener('click', resetCapture);
+  function resetCapture(){
+    capturedDataUrl = null; capturedThumbUrl = null; currentIdentification = null;
+    capturedImg.style.display='none'; video.style.display='none'; placeholder.style.display='flex';
+    document.getElementById('btn-identify').disabled = true;
+    document.getElementById('btn-retake').disabled = true;
+    document.getElementById('btn-snap').disabled = true;
+    document.getElementById('id-result').innerHTML = '<p class="empty">Здесь появится определение вида после анализа снимка.</p>';
+  }
+
+  // ---------------- species identification via Claude API ----------------
+  document.getElementById('btn-identify').addEventListener('click', identifySpecies);
+
+  async function identifySpecies(){
+    if(!capturedDataUrl) return;
+    const resultEl = document.getElementById('id-result');
+    const btn = document.getElementById('btn-identify');
+    btn.disabled = true;
+    resultEl.innerHTML = '<p class="empty"><span class="spinner"></span>анализируем снимок…</p>';
+
+    const base64 = capturedDataUrl.split(',')[1];
+    try{
+      const response = await fetch(CONFIG.PROXY_URL, {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({
+          messages: [{
+            role: "user",
+            content: [
+              {type:"image", source:{type:"base64", media_type:"image/jpeg", data: base64}},
+              {type:"text", text: "Ты — эксперт-биолог, помогающий проекту гражданской науки по мониторингу биоразнообразия. По этой фотографии определи вид животного или растения. Ответь СТРОГО в виде JSON без markdown, без пояснений вне JSON, на русском языке, в формате:\n{\"species\":\"обиходное название\",\"scientificName\":\"латинское название\",\"class\":\"птица|млекопитающее|рептилия|амфибия|насекомое|растение|другое\",\"confidence\":\"высокая|средняя|низкая\",\"conservationStatus\":\"краткий охранный статус или 'неизвестно'\",\"description\":\"1-2 предложения об особенностях особи на фото\"}\nЕсли на фото невозможно определить вид, укажи species:\"не удалось определить\" и объясни в description."}
+            ]
+          }]
+        })
+      });
+      const data = await response.json();
+      let text = (data.content||[]).map(b=>b.text||'').join('').trim();
+      text = text.replace(/```json|```/g,'').trim();
+      const parsed = JSON.parse(text);
+      currentIdentification = parsed;
+      renderIdResult(parsed);
+    }catch(e){
+      resultEl.innerHTML = '<p class="empty">Не удалось получить определение: '+ (e.message||'ошибка сети') +'. Попробуйте ещё раз.</p>';
+    }finally{
+      btn.disabled = false;
+    }
+  }
+
+  function renderIdResult(p){
+    const conf = (p.confidence||'низкая').toLowerCase();
+    document.getElementById('id-result').innerHTML = `
+      <div class="ticket">
+        <div class="sp-common">${escapeHtml(p.species||'—')}</div>
+        <div class="sp-sci">${escapeHtml(p.scientificName||'')}</div>
+        <div class="badges">
+          <span class="badge conf-${conf}">достоверность: ${escapeHtml(p.confidence||'—')}</span>
+          <span class="badge">${escapeHtml(p.class||'—')}</span>
+          <span class="badge">охрана: ${escapeHtml(p.conservationStatus||'неизвестно')}</span>
+        </div>
+        <div class="desc">${escapeHtml(p.description||'')}</div>
+        <div class="divider"></div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-soft)">
+          ${currentGeo.lat!=null ? currentGeo.lat.toFixed(4)+', '+currentGeo.lon.toFixed(4) : 'координаты не указаны'}
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn primary" id="btn-save-obs">Сохранить в журнал</button>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--paper-dim)">
+          <input type="checkbox" id="save-share-check"> поделиться с сообществом
+        </label>
+      </div>
+      ${!session ? '<div class="notice" style="margin-top:10px">Чтобы сохранить наблюдение, нужно войти в аккаунт — вкладка «Аккаунт».</div>' : ''}
+    `;
+    document.getElementById('save-share-check').checked = document.getElementById('toggle-share-default').checked;
+    document.getElementById('btn-save-obs').addEventListener('click', saveObservation);
+  }
+
+  async function saveObservation(){
+    if(!currentIdentification) return;
+    if(!session){
+      toast('Войдите в аккаунт, чтобы сохранить наблюдение');
+      document.querySelector('nav.tabs button[data-tab="account"]').click();
+      return;
+    }
+    const share = document.getElementById('save-share-check').checked;
+    const obs = {
+      id: Date.now()+'-'+Math.random().toString(36).slice(2,8),
+      species: currentIdentification.species || 'неизвестно',
+      scientificName: currentIdentification.scientificName || '',
+      class: currentIdentification.class || 'другое',
+      confidence: currentIdentification.confidence || 'низкая',
+      conservationStatus: currentIdentification.conservationStatus || 'неизвестно',
+      description: currentIdentification.description || '',
+      lat: currentGeo.lat, lon: currentGeo.lon,
+      timestamp: Date.now(),
+      photo: capturedThumbUrl
+    };
+    await insertObservation(obs, false);
+    if(share){
+      await insertObservation(obs, true);
+      toast('Сохранено в личный журнал и в сообщество ✓');
+    } else {
+      toast('Сохранено в личный журнал ✓');
+    }
+    await updateHeaderStats();
+    resetCapture();
+  }
+
+  function escapeHtml(s){
+    return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // ---------------- journal ----------------
+  document.querySelectorAll('#journal-scope button').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      document.querySelectorAll('#journal-scope button').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active'); journalScope = b.dataset.scope; renderJournal();
+    });
+  });
+  document.getElementById('journal-search').addEventListener('input', renderJournal);
+
+  async function renderJournal(){
+    const list = await loadObservations(journalScope==='shared');
+    const q = document.getElementById('journal-search').value.trim().toLowerCase();
+    const filtered = q ? list.filter(o=> (o.species||'').toLowerCase().includes(q) || (o.scientificName||'').toLowerCase().includes(q)) : list;
+    const el = document.getElementById('entries-list');
+    if(filtered.length===0){
+      const msg = journalScope==='shared' ? 'В общей базе пока нет наблюдений.'
+        : (!session ? 'Войдите в аккаунт, чтобы увидеть личный журнал — вкладка «Аккаунт».' : 'Журнал пуст — сделайте первое наблюдение во вкладке «Наблюдение».');
+      el.innerHTML = `<div class="empty-state" style="grid-column:1/-1">${msg}</div>`;
+      return;
+    }
+    el.innerHTML = filtered.map(o=>`
+      <div class="entry-ticket" data-id="${o.id}">
+        ${o.photo ? `<img class="entry-thumb" src="${o.photo}">` : `<div class="entry-thumb"></div>`}
+        <div class="entry-body">
+          <div class="sp">${escapeHtml(o.species)}</div>
+          <div class="sci">${escapeHtml(o.scientificName)}</div>
+          <div class="entry-meta">
+            <span>${new Date(o.timestamp).toLocaleDateString('ru-RU')}</span>
+            <span>${o.lat!=null ? o.lat.toFixed(2)+','+o.lon.toFixed(2) : '—'}</span>
+          </div>
+          <div class="entry-actions">
+            <span class="badge conf-${(o.confidence||'').toLowerCase()}" style="font-size:9px">${escapeHtml(o.confidence||'')}</span>
+            ${journalScope==='personal' ? `<button data-del="${o.id}">удалить</button>` : ''}
+          </div>
+        </div>
+      </div>
+    `).join('');
+    el.querySelectorAll('button[data-del]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const id = btn.dataset.del;
+        await deleteObservation(id);
+        await updateHeaderStats();
+        renderJournal();
+      });
+    });
+  }
+
+  document.getElementById('btn-export').addEventListener('click', async ()=>{
+    const list = await loadObservations(journalScope==='shared');
+    if(list.length===0){ toast('Нет данных для экспорта'); return; }
+    const cols = ['species','scientificName','class','confidence','conservationStatus','lat','lon','timestamp','description'];
+    const rows = [cols.join(',')].concat(list.map(o=>cols.map(c=>{
+      let v = o[c]==null?'':String(o[c]).replace(/"/g,'""');
+      return /[,"\n]/.test(v) ? `"${v}"` : v;
+    }).join(',')));
+    const csv = rows.join('\n');
+    try{
+      const blob = new Blob([csv], {type:'text/csv'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'biosled-observations.csv';
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    }catch(e){
+      toast('Экспорт недоступен в этой среде');
+    }
+  });
+
+  // ---------------- map ----------------
+  document.querySelectorAll('#map-scope button').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      document.querySelectorAll('#map-scope button').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active'); mapScope = b.dataset.scope; refreshMapMarkers();
+    });
+  });
+
+  function initOrRefreshMap(){
+    if(!leafletMap){
+      leafletMap = L.map('map-el', {scrollWheelZoom:false}).setView([20,10], 2);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution:'&copy; OpenStreetMap contributors', maxZoom:18
+      }).addTo(leafletMap);
+      markerLayer = L.layerGroup().addTo(leafletMap);
+      setTimeout(()=>leafletMap.invalidateSize(), 200);
+    }
+    refreshMapMarkers();
+  }
+
+  async function refreshMapMarkers(){
+    if(!leafletMap) return;
+    markerLayer.clearLayers();
+    const list = await loadObservations(mapScope==='shared');
+    const withCoords = list.filter(o=>o.lat!=null && o.lon!=null && !isNaN(o.lat) && !isNaN(o.lon));
+    withCoords.forEach(o=>{
+      const color = classColor(o.class);
+      const icon = L.divIcon({
+        className:'', html:`<div style="width:14px;height:14px;border-radius:50%;background:${color};border:2px solid #efe7d4;box-shadow:0 2px 6px rgba(0,0,0,.4)"></div>`,
+        iconSize:[14,14], iconAnchor:[7,7]
+      });
+      const m = L.marker([o.lat, o.lon], {icon}).addTo(markerLayer);
+      m.bindPopup(`
+        <div class="map-popup">
+          ${o.photo?`<img src="${o.photo}">`:''}
+          <div class="sp">${escapeHtml(o.species)}</div>
+          <div style="font-style:italic;font-size:11px;color:#4a5a4e">${escapeHtml(o.scientificName)}</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;margin-top:4px">${new Date(o.timestamp).toLocaleDateString('ru-RU')}</div>
+        </div>
+      `);
+    });
+    if(withCoords.length){
+      leafletMap.fitBounds(withCoords.map(o=>[o.lat,o.lon]), {maxZoom:9, padding:[30,30]});
+    }
+  }
+
+  // ---------------- analytics ----------------
+  document.querySelectorAll('#analytics-scope button').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      document.querySelectorAll('#analytics-scope button').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active'); analyticsScope = b.dataset.scope; renderAnalytics();
+    });
+  });
+
+  async function renderAnalytics(){
+    const list = await loadObservations(analyticsScope==='shared');
+    const statCardsEl = document.getElementById('stat-cards');
+    if(list.length===0){
+      statCardsEl.innerHTML = '';
+      document.getElementById('panel-analytics').querySelectorAll('.chart-wrap').forEach(w=>w.style.display='none');
+      statCardsEl.innerHTML = `<div class="empty-state" style="grid-column:1/-1">Недостаточно данных для аналитики.</div>`;
+      return;
+    }
+    document.getElementById('panel-analytics').querySelectorAll('.chart-wrap').forEach(w=>w.style.display='block');
+
+    const speciesCounts = {};
+    list.forEach(o=>{ speciesCounts[o.species] = (speciesCounts[o.species]||0)+1; });
+    const uniqueSpecies = Object.keys(speciesCounts).length;
+    const total = list.length;
+    // Shannon diversity index
+    let H = 0;
+    Object.values(speciesCounts).forEach(c=>{ const p = c/total; H -= p*Math.log(p); });
+    const evenness = uniqueSpecies>1 ? (H/Math.log(uniqueSpecies)) : 0;
+
+    statCardsEl.innerHTML = `
+      <div class="stat-card"><div class="v">${total}</div><div class="l">наблюдений</div></div>
+      <div class="stat-card"><div class="v">${uniqueSpecies}</div><div class="l">уникальных видов</div></div>
+      <div class="stat-card"><div class="v">${H.toFixed(2)}</div><div class="l">индекс Шеннона</div></div>
+      <div class="stat-card"><div class="v">${(evenness*100).toFixed(0)}%</div><div class="l">выравненность</div></div>
+    `;
+
+    // timeline (by day)
+    const byDay = {};
+    list.forEach(o=>{ const d = new Date(o.timestamp).toLocaleDateString('ru-RU'); byDay[d]=(byDay[d]||0)+1; });
+    const sortedDays = Object.keys(byDay).sort((a,b)=> new Date(a.split('.').reverse().join('-')) - new Date(b.split('.').reverse().join('-')));
+
+    const gridColor = 'rgba(239,232,216,.1)';
+    const txtColor = '#efe7d4';
+
+    if(chartTimeline) chartTimeline.destroy();
+    chartTimeline = new Chart(document.getElementById('chart-timeline'), {
+      type:'line',
+      data:{labels:sortedDays, datasets:[{label:'наблюдения', data:sortedDays.map(d=>byDay[d]), borderColor:'#e2a75c', backgroundColor:'rgba(226,167,92,.15)', fill:true, tension:.3}]},
+      options:{plugins:{legend:{display:false}}, scales:{x:{ticks:{color:txtColor},grid:{color:gridColor}}, y:{ticks:{color:txtColor,precision:0},grid:{color:gridColor}}}}
+    });
+
+    // species distribution (top 8)
+    const topSpecies = Object.entries(speciesCounts).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    if(chartSpecies) chartSpecies.destroy();
+    chartSpecies = new Chart(document.getElementById('chart-species'), {
+      type:'bar',
+      data:{labels:topSpecies.map(s=>s[0]), datasets:[{label:'встреч', data:topSpecies.map(s=>s[1]), backgroundColor:'#6fa287'}]},
+      options:{plugins:{legend:{display:false}}, scales:{x:{ticks:{color:txtColor},grid:{display:false}}, y:{ticks:{color:txtColor,precision:0},grid:{color:gridColor}}}}
+    });
+
+    // species trend selector
+    const select = document.getElementById('species-select');
+    const prevVal = select.value;
+    select.innerHTML = Object.keys(speciesCounts).sort().map(s=>`<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+    if(prevVal && speciesCounts[prevVal]) select.value = prevVal;
+    select.onchange = ()=>renderTrendChart(list, select.value);
+    renderTrendChart(list, select.value);
+  }
+
+  function renderTrendChart(list, species){
+    const filtered = list.filter(o=>o.species===species);
+    const byWeek = {};
+    filtered.forEach(o=>{
+      const d = new Date(o.timestamp);
+      const weekStart = new Date(d); weekStart.setDate(d.getDate() - d.getDay());
+      const key = weekStart.toLocaleDateString('ru-RU');
+      byWeek[key] = (byWeek[key]||0)+1;
+    });
+    const weeks = Object.keys(byWeek).sort((a,b)=> new Date(a.split('.').reverse().join('-')) - new Date(b.split('.').reverse().join('-')));
+    const gridColor = 'rgba(239,232,216,.1)', txtColor = '#efe7d4';
+    if(chartTrend) chartTrend.destroy();
+    chartTrend = new Chart(document.getElementById('chart-trend'), {
+      type:'line',
+      data:{labels:weeks, datasets:[{label:'встреч в неделю', data:weeks.map(w=>byWeek[w]), borderColor:'#c98a3b', backgroundColor:'rgba(201,138,59,.15)', fill:true, tension:.3, pointRadius:4}]},
+      options:{plugins:{legend:{display:false}}, scales:{x:{ticks:{color:txtColor},grid:{color:gridColor}}, y:{ticks:{color:txtColor,precision:0},grid:{color:gridColor}}}}
+    });
+  }
+
+  // ---------------- settings ----------------
+  document.getElementById('btn-clear').addEventListener('click', async ()=>{
+    if(!confirm('Удалить все личные наблюдения безвозвратно?')) return;
+    await clearPersonalObservations();
+    await updateHeaderStats();
+    renderJournal();
+    toast('Личный журнал очищен');
+  });
+
+  // ---------------- init ----------------
+  loadSession();
+  renderAccountUI();
+  updateHeaderStats();
+
+  // register service worker for installable / offline use (no-op if unsupported or blocked)
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('./service-worker.js').catch(()=>{});
+  }
+})();
+</script>
+</body>
+</html>
